@@ -1,5 +1,7 @@
 from collections import defaultdict
 
+FAILED_ATTEMPTS = 0
+
 class Cell(object):
     remaining_values = {1, 2, 3, 4, 5, 6, 7, 8, 9}
     final_value = None
@@ -83,18 +85,42 @@ class Cell(object):
 
 class Board(object):
 
-
     def __init__(self, board):
-        self.basic_board = board
-        # should probably do a proper init, innit?
-
         self.cell_board = []
         for row in xrange(9):
             self.cell_board.append([])
             for column in xrange(9):
-                value = self.basic_board[row][column]
+                value = board[row][column]
                 cell = Cell(row, column, self.cell_board, value)
                 self.cell_board[row].append(cell)
+
+    # Do I reaaaaally want to backtrack? is there another way?
+    @property
+    def reached_contradiction(self):
+        return any(
+            (not cell.final_value and not cell.remaining_values)
+            for cell in self.cells
+        )
+
+    @property
+    def solved(self):
+        return all(cell.final_value for cell in self.cells)
+
+    @property
+    def cells(self):
+        for row in xrange(9):
+            for column in xrange(9):
+                cell = self.cell_board[row][column]
+                yield cell
+
+    @property
+    def basic_representation(self):
+        rows = []
+
+        for row in self.cell_board:
+            rows.append([cell.final_value or 0 for cell in row])
+
+        return rows
 
     def __repr__(self):
         line_format   = "{} {} {} | {} {} {} | {} {} {}"
@@ -113,14 +139,83 @@ class Board(object):
         lines.append(line_format.format(*map(number_display, self.cell_board[6][0]._cells_in_row())))
         lines.append(line_format.format(*map(number_display, self.cell_board[7][0]._cells_in_row())))
         lines.append(line_format.format(*map(number_display, self.cell_board[8][0]._cells_in_row())))
-        return '\n'.join(lines)
+        return '\n' + '\n'.join(lines) + '\n'
 
-    def cycle(self):
-        for row in xrange(9):
-            for column in xrange(9):
-                cell = self.cell_board[row][column]
+
+    def find_smallest_guess(self):
+        row = None
+        column = None
+        guesses = None
+
+        for cell in self.cells:
+            if not cell.remaining_values:
+                continue
+
+            if (guesses is None) or len(guesses) > len(cell.remaining_values):
+                row = cell.row
+                column = cell.column
+                guesses = cell.remaining_values
+
+        if not guesses:
+            print "wtf"
+            raise AssertionError
+
+        return row, column, guesses
+
+
+    @property
+    def is_valid(self):
+        # well this is an overly-onerous way of doing this, but screw it.
+        for cell in self.cells:
+            row_values = set(x.final_value for x in cell._cells_in_row())
+            column_values = set(x.final_value for x in cell._cells_in_column())
+            square_values = set(x.final_value for x in cell._cells_in_square())
+
+            all_equal = row_values == column_values == square_values == {1, 2, 3, 4, 5, 6, 7, 8, 9}
+            if not all_equal:
+                import ipdb; ipdb.set_trace()
+                return False
+
+        return True
+
+    def solve(self):
+        while True:
+            print self
+
+            state_0 = str(self.cell_board)
+
+            for cell in self.cells:
                 cell.process()
-        print self
+
+            state_1 = str(self.cell_board)
+            if state_0 == state_1:
+                if self.solved:
+                    print "OMG SOLVED"
+                    if self.is_valid:
+                        print "omg and it's valid too!"
+                    else:
+                        print "curious. doesn't seem to be right."
+
+                    print self
+                    return True
+
+                if self.reached_contradiction:
+                    print "contradiction found."
+                    return False
+
+                # stalemate, then - need to make a guess.
+                row, column, guesses  = self.find_smallest_guess()
+                for guess in guesses:
+                    basic_representation = self.basic_representation
+                    basic_representation[row][column] = guess
+
+                    new_board = Board(basic_representation)
+                    print "Making assumption: row={row}, col={col}, value={guess}...".format(row=row, col=column, guess=guess)
+                    print self
+                    result = new_board.solve()
+                    if result:
+                        return True
+                return False
 
 
 test_board_1 = [
@@ -147,6 +242,31 @@ test_board_2 = [
     [0, 2, 6, 5, 0, 0, 4, 0, 0],
 ]
 
-board = Board(test_board_2)
-import ipdb; ipdb.set_trace()
-print board
+test_board_3 = [
+    [0, 0, 0, 5, 0, 4, 0, 0, 0],
+    [0, 0, 8, 0, 0, 0, 3, 0, 0],
+    [7, 5, 0, 0, 2, 0, 0, 0, 6],
+    [0, 0, 0, 7, 8, 0, 2, 6, 4],
+    [0, 6, 0, 0, 9, 0, 0, 0, 8],
+    [5, 0, 0, 0, 0, 6, 0, 0, 0],
+    [0, 0, 5, 0, 3, 0, 9, 0, 7],
+    [0, 0, 2, 6, 0, 9, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 3, 0],
+]
+
+
+# The hardest button to button
+test_board_x = [
+    [8, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 3, 6, 0, 0, 0, 0, 0],
+    [0, 7, 0, 0, 9, 0, 2, 0, 0],
+    [0, 5, 0, 0, 0, 7, 0, 0, 0],
+    [0, 0, 0, 0, 4, 5, 7, 0, 0],
+    [0, 0, 0, 1, 0, 0, 0, 3, 0],
+    [0, 0, 1, 0, 0, 0, 0, 6, 8],
+    [0, 0, 8, 5, 0, 0, 0, 1, 0],
+    [0, 9, 0, 0, 0, 0, 4, 0, 0],
+]
+
+board = Board(test_board_x)
+board.solve()
