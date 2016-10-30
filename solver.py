@@ -1,6 +1,5 @@
 from collections import defaultdict
 
-FAILED_ATTEMPTS = 0
 
 class Cell(object):
     remaining_values = {1, 2, 3, 4, 5, 6, 7, 8, 9}
