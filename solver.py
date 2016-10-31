@@ -82,18 +82,19 @@ class Cell(object):
                 self.remaining_values = set()
                 return
 
+
 class Board(object):
 
     def __init__(self, board):
-        self.cell_board = []
+        # initialise rows to put cell objects in
+        self._cell_board = [[], [], [], [], [], [], [], [], []]
+
         for row in xrange(9):
-            self.cell_board.append([])
             for column in xrange(9):
                 value = board[row][column]
-                cell = Cell(row, column, self.cell_board, value)
-                self.cell_board[row].append(cell)
+                cell = Cell(row, column, self._cell_board, value)
+                self[row].append(cell)
 
-    # Do I reaaaaally want to backtrack? is there another way?
     @property
     def reached_contradiction(self):
         return any(
@@ -109,17 +110,20 @@ class Board(object):
     def cells(self):
         for row in xrange(9):
             for column in xrange(9):
-                cell = self.cell_board[row][column]
+                cell = self[row][column]
                 yield cell
 
     @property
     def basic_representation(self):
         rows = []
 
-        for row in self.cell_board:
+        for row in self._cell_board:
             rows.append([cell.final_value or 0 for cell in row])
 
         return rows
+
+    def __getitem__(self, i):
+        return self._cell_board[i]
 
     def __repr__(self):
         line_format   = "{} {} {} | {} {} {} | {} {} {}"
@@ -127,21 +131,24 @@ class Board(object):
         number_display = lambda x: x.final_value if x.final_value else ' '
         lines = []
 
-        lines.append(line_format.format(*map(number_display, self.cell_board[0][0]._cells_in_row())))
-        lines.append(line_format.format(*map(number_display, self.cell_board[1][0]._cells_in_row())))
-        lines.append(line_format.format(*map(number_display, self.cell_board[2][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[0][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[1][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[2][0]._cells_in_row())))
         lines.append(row_separator)
-        lines.append(line_format.format(*map(number_display, self.cell_board[3][0]._cells_in_row())))
-        lines.append(line_format.format(*map(number_display, self.cell_board[4][0]._cells_in_row())))
-        lines.append(line_format.format(*map(number_display, self.cell_board[5][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[3][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[4][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[5][0]._cells_in_row())))
         lines.append(row_separator)
-        lines.append(line_format.format(*map(number_display, self.cell_board[6][0]._cells_in_row())))
-        lines.append(line_format.format(*map(number_display, self.cell_board[7][0]._cells_in_row())))
-        lines.append(line_format.format(*map(number_display, self.cell_board[8][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[6][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[7][0]._cells_in_row())))
+        lines.append(line_format.format(*map(number_display, self[8][0]._cells_in_row())))
         return '\n' + '\n'.join(lines) + '\n'
 
-
     def find_smallest_guess(self):
+        # bit of an optimisation - if there's a cell with like 9 things you could guess that,
+        # that might take a while. So let's just find the cell with the fewest possibilities
+        # and pick one of those.
+
         row = None
         column = None
         guesses = None
@@ -172,21 +179,27 @@ class Board(object):
 
             all_equal = row_values == column_values == square_values == {1, 2, 3, 4, 5, 6, 7, 8, 9}
             if not all_equal:
-                import ipdb; ipdb.set_trace()
                 return False
 
         return True
+
+    @property
+    def state(self):
+        # gives a string representation of the full state of the board
+        # including assumptions
+        return str(list(self.cells))
 
     def solve(self):
         while True:
             print self
 
-            state_0 = str(self.cell_board)
+            state_0 = self.state
 
             for cell in self.cells:
                 cell.process()
 
-            state_1 = str(self.cell_board)
+            state_1 = self.state
+
             if state_0 == state_1:
                 if self.solved:
                     print "OMG SOLVED"
